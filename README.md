@@ -1,3 +1,2 @@
-# chessdotcomforschools
-chess.com is blocked in most schools, but github isn't
+# your-math-guide
 site: https://qwaserbar.github.io/yourmathguide
