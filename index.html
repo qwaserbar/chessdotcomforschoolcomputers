@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Play Chess Against a Bot</title>
+    <title>Play Chess Against Stockfish</title>
     <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.css">
     <style>
         #board {
@@ -17,7 +17,7 @@
     </style>
 </head>
 <body>
-    <h1 style="text-align:center;">Play Chess Against a Bot</h1>
+    <h1 style="text-align:center;">Play Chess Against Stockfish</h1>
     <div id="board" style="width: 400px"></div>
     <div id="status"></div>
     <button id="startBtn">Start Position</button>
@@ -25,14 +25,14 @@
 
     <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://cdn.rawgit.com/nmrugg/stockfish.js/2017-10-02/src/stockfish.js"></script>
-    
+    <script src="https://stockfishjs.com/stockfish.js"></script> <!-- Load Stockfish.js -->
+
     <script>
         const board = ChessBoard('board', {
             draggable: true,
             position: 'start',
-            onDrop: onDrop,
-            onSnapEnd: onSnapEnd,
+            onDrop: handleDrop,
+            onSnapEnd: () => board.position(game.fen()),
             pieceTheme: {
                 'wK': 'https://www.megachess.com/cdn/shop/products/2017_Mega_Chess_Need_to_Clip-52_6b3aa585-ca13-403a-99b5-e848a49922e6.png?v=1535652961',
                 'wQ': 'https://upload.wikimedia.org/wikipedia/commons/a/af/Chess_piece_-_White_queen.jpg',
@@ -50,49 +50,32 @@
         });
 
         const game = new Chess();
-        let stockfish = new Worker('https://cdn.rawgit.com/nmrugg/stockfish.js/2017-10-02/src/stockfish.js');
-
-        stockfish.postMessage('uci');
+        let stockfish = new Worker("https://stockfishjs.com/stockfish.js");
 
         stockfish.onmessage = function(event) {
-            if (event.data.includes('bestmove')) {
-                const move = event.data.split(' ')[1];
-                game.move(move);
+            if (event.data.startsWith('bestmove')) {
+                const bestMove = event.data.split(' ')[1];
+                game.move(bestMove);
                 board.position(game.fen());
                 renderMoveHistory(game.history());
-                if (!game.game_over()) {
-                    makeBestMove();
-                }
             }
         };
 
-        function onDrop(source, target) {
-            const move = game.move({
-                from: source,
-                to: target,
-                promotion: 'q' // promote to queen
-            });
-
+        function handleDrop(source, target) {
+            const move = game.move({ from: source, to: target, promotion: 'q' });
             removeGreySquares();
             if (move === null) return 'snapback';
             renderMoveHistory(game.history());
-            if (!game.game_over()) {
-                makeBestMove();
-            }
-        }
-
-        function onSnapEnd() {
-            board.position(game.fen());
+            if (!game.game_over()) makeBestMove();
         }
 
         function renderMoveHistory(moves) {
-            const historyElement = document.getElementById('status');
-            historyElement.innerHTML = 'Moves: ' + moves.join(', ');
+            document.getElementById('status').innerHTML = 'Moves: ' + moves.join(', ');
         }
 
         function makeBestMove() {
             stockfish.postMessage('position fen ' + game.fen());
-            stockfish.postMessage('go movetime 2000');
+            stockfish.postMessage('go movetime 1000'); // Adjust thinking time here
         }
 
         function removeGreySquares() {
