@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Against Bot</title>
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css" />
+    <style>
+        #board {
+            width: 400px;
+        }
+        #status {
+            font-size: 24px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Play Chess Against a Bot!</h1>
+<div id="board" style="width: 400px"></div>
+<div id="status"></div>
+<button id="startBtn">Start Position</button>
+<button id="clearBtn">Clear Board</button>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://unpkg.com/chess.js@0.10.3/chess.js"></script>
+<script>
+    const board = ChessBoard('board', {
+        draggable: true,
+        position: 'start',
+        onDragStart: onDragStart,
+        onDrop: onDrop,
+    });
+
+    const chess = new Chess();
+
+    function onDragStart(source, piece, position, orientation) {
+        if (chess.in_checkmate() === true || chess.in_draw() === true ||
+            piece.search(/^b/) !== -1) {
+            return false;
+        }
+    }
+
+    function onDrop(source, target) {
+        const move = chess.move({
+            from: source,
+            to: target,
+            promotion: 'q' // always promote to a queen for simplicity
+        });
+
+        removeGreySquares();
+        if (move === null) return 'snapback';
+
+        updateStatus();
+        if (chess.game_over()) return;
+
+        // Bot's turn
+        setTimeout(botMove, 500);
+    }
+
+    function botMove() {
+        const moves = chess.ugly_moves();
+        const randomMove = moves[Math.floor(Math.random() * moves.length)];
+        chess.move(randomMove);
+        board.move(randomMove.san);
+        updateStatus();
+    }
+
+    function updateStatus() {
+        let status = '';
+        if (chess.in_checkmate()) {
+            status = 'Game over, you are in checkmate!';
+        } else if (chess.in_draw()) {
+            status = 'Game over, it\'s a draw!';
+        } else {
+            status = 'Your turn';
+        }
+
+        $('#status').html(status);
+    }
+
+    function removeGreySquares() {
+        $('#board .square-55d63').css('background', '');
+    }
+
+    $('#startBtn').on('click', board.start);
+    $('#clearBtn').on('click', board.clear);
+
+    updateStatus();
+</script>
+
+</body>
+</html>
