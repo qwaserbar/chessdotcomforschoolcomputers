@@ -4,88 +4,100 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Play Chess Against Stockfish</title>
-    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.css">
+    <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs/dist/chessboard-1.0.0.css">
     <style>
         #board {
             width: 400px;
-            margin: 20px auto;
-        }
-        #status {
-            text-align: center;
-            margin-top: 10px;
+            height: 400px;
+            background: url('https://raw.githubusercontent.com/qwaserbar/yourmathguide/assets/board.svg') no-repeat center center;
+            background-size: cover;
+            position: relative;
         }
     </style>
 </head>
 <body>
-    <h1 style="text-align:center;">Play Chess Against Stockfish</h1>
-    <div id="board" style="width: 400px"></div>
-    <div id="status"></div>
-    <button id="startBtn">Start Position</button>
-    <button id="clearBtn">Clear Board</button>
 
-    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-    <script src="https://stockfishjs.com/stockfish.js"></script> <!-- Load Stockfish.js -->
+<h1>Play Chess Against Stockfish</h1>
+<div id="board"></div>
+<button id="startBtn">Start Position</button>
+<button id="clearBtn">Clear Board</button>
+<button id="makeMoveBtn">Make Move</button>
+<pre id="status"></pre>
+<pre id="fen"></pre>
 
-    <script>
-        const board = ChessBoard('board', {
-            draggable: true,
-            position: 'start',
-            onDrop: handleDrop,
-            onSnapEnd: () => board.position(game.fen()),
-            pieceTheme: {
-                'wK': 'https://www.megachess.com/cdn/shop/products/2017_Mega_Chess_Need_to_Clip-52_6b3aa585-ca13-403a-99b5-e848a49922e6.png?v=1535652961',
-                'wQ': 'https://upload.wikimedia.org/wikipedia/commons/a/af/Chess_piece_-_White_queen.jpg',
-                'wR': 'https://atlas-content-cdn.pixelsquid.com/stock-images/chess-piece-rook-white-chessmen-2MEVBrF-600.jpg',
-                'wB': 'https://www.megachess.com/cdn/shop/products/additional_megachess-46_4ca2b004-59ac-4f9e-a3b1-9f4640abcfe6_800x.png?v=1535642863',
-                'wN': 'https://images.chesscomfiles.com/uploads/v1/images_users/tiny_mce/MySeT/phpgpiOFN.jpeg',
-                'wP': 'https://3.imimg.com/data3/SI/XX/MY-1081084/chess-pawn-500x500.jpg',
-                'bK': 'https://www.megachess.com/cdn/shop/products/additional_megachess-8_51ceac04-393d-4374-aaff-ee3a895ab44f_800x.png?v=1535650833',
-                'bQ': 'https://e7.pngegg.com/pngimages/697/933/png-clipart-chess-piece-queen-chess-chess-queen-thumbnail.png',
-                'bR': 'https://www.megachess.com/cdn/shop/products/additional_megachess-33_95096217-061a-484c-a4a4-a4c914bc84d8_800x.png?v=1535646648',
-                'bB': 'https://img.freepik.com/premium-psd/black-bishop-chess-piece-isolated-white-background-3d-render-illustration_989822-148.jpg',
-                'bN': 'https://i.pinimg.com/736x/d6/bb/e8/d6bbe8281d97f4a3f169f380f341c0d6.jpg',
-                'bP': 'https://blog.chesshouse.com/wp-content/uploads/2014/07/Pawn-Piece.jpg',
-            }
+<script src="https://unpkg.com/@chrisoakman/chessboardjs/dist/chessboard-1.0.0.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/official-stockfish/Stockfish/src/stockfish.js"></script>
+<script>
+    const board = ChessBoard('board', {
+        draggable: true,
+        position: 'start',
+        onDrop: handleDrop,
+        onSnapEnd: onSnapEnd,
+        pieceTheme: 'images/{piece}.svg' // Path to SVG images for the pieces
+    });
+
+    const stockfish = new Worker('path/to/stockfish.js');
+    let game = new Chess();
+    const statusEl = document.getElementById('status');
+    const fenEl = document.getElementById('fen');
+
+    function handleDrop(source, target) {
+        const move = game.move({
+            from: source,
+            to: target,
+            promotion: 'q' // always promote to a queen for simplicity
         });
 
-        const game = new Chess();
-        let stockfish = new Worker("https://stockfishjs.com/stockfish.js");
+        if (move === null) return 'snapback'; // illegal move
 
-        stockfish.onmessage = function(event) {
-            if (event.data.startsWith('bestmove')) {
-                const bestMove = event.data.split(' ')[1];
-                game.move(bestMove);
-                board.position(game.fen());
-                renderMoveHistory(game.history());
-            }
-        };
+        updateStatus();
+        stockfish.postMessage('position fen ' + game.fen());
+        stockfish.postMessage('go depth 10');
+    }
 
-        function handleDrop(source, target) {
-            const move = game.move({ from: source, to: target, promotion: 'q' });
-            removeGreySquares();
-            if (move === null) return 'snapback';
-            renderMoveHistory(game.history());
-            if (!game.game_over()) makeBestMove();
+    stockfish.onmessage = function(event) {
+        const msg = event.data;
+        if (msg.startsWith('bestmove')) {
+            const move = msg.split(' ')[1];
+            game.move(move);
+            board.position(game.fen());
+            updateStatus();
         }
+    };
 
-        function renderMoveHistory(moves) {
-            document.getElementById('status').innerHTML = 'Moves: ' + moves.join(', ');
+    function onSnapEnd() {
+        board.position(game.fen());
+    }
+
+    function updateStatus() {
+        if (game.game_over()) {
+            statusEl.innerHTML = 'Game over';
+        } else {
+            statusEl.innerHTML = (game.turn() === 'w' ? 'White' : 'Black') + ' to move';
         }
+        fenEl.innerHTML = game.fen();
+    }
 
-        function makeBestMove() {
-            stockfish.postMessage('position fen ' + game.fen());
-            stockfish.postMessage('go movetime 1000'); // Adjust thinking time here
-        }
+    document.getElementById('startBtn').addEventListener('click', () => {
+        game.reset(); // Reset the game state
+        board.start(); // Reset the board to starting position
+        updateStatus(); // Update status display
+    });
 
-        function removeGreySquares() {
-            document.querySelectorAll('#board .square-55d63').forEach(square => {
-                square.classList.remove('square-55d63');
-            });
-        }
+    document.getElementById('clearBtn').addEventListener('click', () => {
+        game.clear(); // Clear the game state
+        board.clear(); // Clear the board
+        statusEl.innerHTML = ''; // Clear status
+        fenEl.innerHTML = ''; // Clear FEN
+    });
 
-        document.getElementById('startBtn').addEventListener('click', board.start);
-        document.getElementById('clearBtn').addEventListener('click', board.clear);
-    </script>
+    document.getElementById('makeMoveBtn').addEventListener('click', () => {
+        stockfish.postMessage('position fen ' + game.fen());
+        stockfish.postMessage('go depth 10');
+    });
+
+    // Initialize the Stockfish engine
+    stockfish.postMessage('uci');
+</script>
 </body>
 </html>
